@@ -369,7 +369,7 @@ create or replace pipe order_pipe
 auto_ingest = true
 as
      copy into landing_order from @delta_orders_s3
-     file_format= (type = csv compression = none)
+     file_format= (type = csv compression = none skip_header = 1)
      pattern = '.*order.*[.]csv' --get the file that has word order followed by csv extention.
      on_error = continue;
 
@@ -377,7 +377,7 @@ create or replace pipe item_pipe
 auto_ingest = true
 as
      copy into landing_item from @delta_items_s3
-     file_format= (type = csv compression = none)
+     file_format= (type = csv compression = none skip_header = 1)
      pattern = '.*item.*[.]csv' --get the file that has word item followed by csv extention.
      on_error = continue;
 
@@ -385,7 +385,7 @@ create or replace pipe customer_pipe
 auto_ingest = true
 as
      copy into landing_customer from @delta_customers_s3
-     file_format= (type = csv compression = none)
+     file_format= (type = csv compression = none skip_header = 1)
      pattern = '.*customer.*[.]csv' --get the file that has word customer followed by csv extention.
      on_error = continue;
 
@@ -621,7 +621,7 @@ as
         i.item_category = c.item_category
     when matched 
     and c.METADATA$ACTION = 'DELETE'
-    AND c.METADATA$ISUPDATE = 'FASLE'
+    AND c.METADATA$ISUPDATE = 'FALSE'
     then update set 
     i.active_flag = 'N',
     updated_timestamp = current_timestamp()
@@ -670,7 +670,7 @@ as
         cd.email_address = c.email_address
     when matched 
     and c.METADATA$ACTION = 'DELETE'
-    AND c.METADATA$ISUPDATE = 'FASLE'
+    AND c.METADATA$ISUPDATE = 'FALSE'
     then update set 
     cd.active_flag = 'N',
     cd.updated_timestamp = current_timestamp()
@@ -757,11 +757,41 @@ ORDER BY SCHEDULED_TIME;
 ------------------------------------------------------------------------------------------------------------------
 use schema landing_zone;
 show streams;
+--STREAMS 
+SELECT * FROM LANDING_CUSTOMER_STM; --1 ROW
+SELECT * FROM LANDING_ITEM_STM; -- 1 ROW
+SELECT * FROM LANDING_ORDER_STM; --0 ROW
 
+--TABLE
+SELECT * FROM LANDING_CUSTOMER; --101
+SELECT * FROM LANDING_ITEM; --101
+SELECT * FROM LANDING_ORDER; --101
+
+
+
+--------------------------------------------
 use schema curated_zone;
-show tables;
+show STREAMS;
 
+SELECT * FROM CURATED_CUSTOMER_STM; --1 ROW
+SELECT * FROM CURATED_ORDER_STM; --1 ROW
+SELECT * FROM CURATED_ITEM_STM; --2 ROW (THIS IS AN UPDATE ONLY NOT AN INSERT. SO ONE ROW FOR DELETE AND ONE ROW FOR INSERT)
+
+SELECT * FROM CURATED_CUSTOMER; --101 ROW
+SELECT * FROM CURATED_ITEM; --100 ROW AS THIS IS ONLY UPDATING A RECORD AND NOT INSERTING ONE.
+SELECT * FROM CURATED_ORDER; --101
+SHOW TASKS;
+
+
+SELECT * FROM TABLE(INFORMATION_SCHEMA.TASK_HISTORY())
+WHERE NAME IN ('CUSTOMER_CURATED_TSK', 'ITEM_CURATED_TSK', 'ORDER_CURATED_TSK')
+ORDER BY SCHEDULED_TIME;
+----------------------------
 use schema consumption_zone;
+
+SELECT * FROM CUSTOMER_DIM; --101 ROWS
+SELECT * FROM ITEM_DIM; --100 ROWS
+SELECT * FROM ORDER_FACT; --521 ROWS
 show tables;
 
 show tasks;
@@ -771,4 +801,3 @@ show streams;
 select * from table(information_schema.task_history())
 where name in ('CUSTOMER_CONSUMPTION_TSK', 'ITEM_CONSUMPTION_TSK', 'ORDER_FACT_TSK')
 ORDER BY SCHEDULED_TIME;
-
